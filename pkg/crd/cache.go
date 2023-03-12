@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	metrics "github.com/rcrowley/go-metrics"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -47,8 +47,9 @@ func NewCache(client *rest.RESTClient, syncInterval time.Duration) *Cache {
 	listWatch := cache.NewListWatchFromClient(client, "sqsautoscalers", "", fields.Everything())
 	store := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{})
 	c.Store = store
+	queueOptions := cache.DeltaFIFOOptions{KeyFunction: cache.MetaNamespaceKeyFunc, KnownObjects: store, EmitDeltaTypeReplaced: false}
 	config := &cache.Config{
-		Queue:            cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, store),
+		Queue:            cache.NewDeltaFIFOWithOptions(queueOptions),
 		ListerWatcher:    listWatch,
 		ObjectType:       &SqsAutoScaler{},
 		FullResyncPeriod: syncInterval,
