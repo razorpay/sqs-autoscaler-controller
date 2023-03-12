@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/razorpay/sqs-autoscaler-controller/pkg/crd"
 	"github.com/rcrowley/go-metrics"
-	"github.com/uswitch/sqs-autoscaler-controller/pkg/crd"
+	log "github.com/sirupsen/logrus"
 	"github.com/vmg/backoff"
-	appsv1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -82,8 +82,8 @@ func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *
 		return nil, 0, err
 	}
 
-	deployments := s.client.Apps().Deployments(scale.ObjectMeta.Namespace)
-	deployment, err := deployments.Get(scale.Spec.Deployment, metav1.GetOptions{})
+	deployments := s.client.AppsV1().Deployments(scale.ObjectMeta.Namespace)
+	deployment, err := deployments.Get(context.TODO(), scale.Spec.Deployment, metav1.GetOptions{})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -99,7 +99,7 @@ func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *
 
 	delta := replicas - *deployment.Spec.Replicas
 	deployment.Spec.Replicas = &replicas
-	updated, err := deployments.Update(deployment)
+	updated, err := deployments.Update(context.TODO(), deployment, metav1.UpdateOptions{})
 
 	if delta != 0 && err == nil {
 		metrics.GetOrRegisterMeter("scaler.adjust", metrics.DefaultRegistry).Mark(1)

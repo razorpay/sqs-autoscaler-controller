@@ -1,9 +1,10 @@
 package crd
 
 import (
+	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -38,7 +39,7 @@ func (s *SqsAutoScaler) RecordEvent(k *kubernetes.Clientset, eventType, reason, 
 		Message:        message,
 		Type:           eventType,
 	}
-	_, err := k.CoreV1().Events(s.ObjectMeta.Namespace).Create(event)
+	_, err := k.CoreV1().Events(s.ObjectMeta.Namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 
 	return err
 }

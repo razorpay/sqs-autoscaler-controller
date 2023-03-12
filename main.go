@@ -7,17 +7,17 @@ import (
 	"os/signal"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/pubnub/go-metrics-statsd"
 	"github.com/rcrowley/go-metrics"
-	"gopkg.in/alecthomas/kingpin.v2"
+	log "github.com/sirupsen/logrus"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/uswitch/sqs-autoscaler-controller/pkg/crd"
-	"github.com/uswitch/sqs-autoscaler-controller/pkg/scaler"
+	"github.com/razorpay/sqs-autoscaler-controller/pkg/crd"
+	"github.com/razorpay/sqs-autoscaler-controller/pkg/scaler"
 )
 
 type options struct {
