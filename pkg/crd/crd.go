@@ -30,12 +30,14 @@ func EnsureResource(client apiextensionsclient.Interface) error {
 					Served:     true,
 					Storage:    true,
 					Deprecated: false,
+					Schema:     &v1.CustomResourceValidation{},
 				},
 				{
 					Name:       "v1beta1",
 					Served:     true,
 					Storage:    false,
 					Deprecated: true,
+					Schema:     &v1.CustomResourceValidation{},
 				},
 			},
 			Names: v1.CustomResourceDefinitionNames{
