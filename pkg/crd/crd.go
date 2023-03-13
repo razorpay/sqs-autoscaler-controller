@@ -30,12 +30,42 @@ func EnsureResource(client apiextensionsclient.Interface) error {
 					Served:     true,
 					Storage:    true,
 					Deprecated: false,
+					Schema: &v1.CustomResourceValidation{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							ID:          "<schema-url>",
+							Description: "openapi3.0 schema for validation & pruning",
+							Type:        "object",
+							Required: []string{
+								"deployment",
+								"maxPods",
+								"minPods",
+								"queue",
+								"scaleDown",
+								"scaleUp",
+							},
+						},
+					},
 				},
 				{
 					Name:       "v1beta1",
 					Served:     true,
 					Storage:    false,
 					Deprecated: true,
+					Schema: &v1.CustomResourceValidation{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							ID:          "<schema-url>",
+							Description: "openapi3.0 schema for validation & pruning",
+							Type:        "object",
+							Required: []string{
+								"deployment",
+								"maxPods",
+								"minPods",
+								"queue",
+								"scaleDown",
+								"scaleUp",
+							},
+						},
+					},
 				},
 			},
 			Names: v1.CustomResourceDefinitionNames{
