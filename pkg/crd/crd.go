@@ -32,7 +32,6 @@ func EnsureResource(client apiextensionsclient.Interface) error {
 					Deprecated: false,
 					Schema: &v1.CustomResourceValidation{
 						OpenAPIV3Schema: &v1.JSONSchemaProps{
-							ID:          "<schema-url>",
 							Description: "openapi3.0 schema for validation & pruning",
 							Type:        "object",
 							Required: []string{
@@ -53,7 +52,6 @@ func EnsureResource(client apiextensionsclient.Interface) error {
 					Deprecated: true,
 					Schema: &v1.CustomResourceValidation{
 						OpenAPIV3Schema: &v1.JSONSchemaProps{
-							ID:          "<schema-url>",
 							Description: "openapi3.0 schema for validation & pruning",
 							Type:        "object",
 							Required: []string{
