@@ -44,7 +44,7 @@ func (in *SqsAutoScaler) DeepCopyObject() runtime.Object {
 func (in *SqsAutoScalerList) DeepCopyInto(out *SqsAutoScalerList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SqsAutoScaler, len(*in))

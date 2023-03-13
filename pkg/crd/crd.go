@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,22 +17,63 @@ import (
 )
 
 func EnsureResource(client apiextensionsclient.Interface) error {
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &v1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "sqsautoscalers.aws.uswitch.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "aws.uswitch.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: v1.CustomResourceDefinitionSpec{
+			Group: "aws.uswitch.com",
+			Scope: v1.NamespaceScoped,
+			Versions: []v1.CustomResourceDefinitionVersion{
+				{
+					Name:       "v1",
+					Served:     true,
+					Storage:    true,
+					Deprecated: false,
+					Schema: &v1.CustomResourceValidation{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							Description: "openapi3.0 schema for validation & pruning",
+							Type:        "object",
+							Required: []string{
+								"deployment",
+								"maxPods",
+								"minPods",
+								"queue",
+								"scaleDown",
+								"scaleUp",
+							},
+						},
+					},
+				},
+				{
+					Name:       "v1beta1",
+					Served:     true,
+					Storage:    false,
+					Deprecated: true,
+					Schema: &v1.CustomResourceValidation{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							Description: "openapi3.0 schema for validation & pruning",
+							Type:        "object",
+							Required: []string{
+								"deployment",
+								"maxPods",
+								"minPods",
+								"queue",
+								"scaleDown",
+								"scaleUp",
+							},
+						},
+					},
+				},
+			},
+			Names: v1.CustomResourceDefinitionNames{
 				Singular: "sqsautoscaler",
 				Plural:   "sqsautoscalers",
 				Kind:     reflect.TypeOf(SqsAutoScaler{}).Name(),
 			},
 		},
 	}
-	_, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+	_, err := client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		return nil
 	}
