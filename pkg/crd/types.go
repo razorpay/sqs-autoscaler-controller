@@ -11,9 +11,9 @@ type SqsAutoScaler struct {
 }
 
 type SqsAutoScalerList struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Items             []SqsAutoScaler `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []SqsAutoScaler `json:"items"`
 }
 
 type AutoScalerSpec struct {
