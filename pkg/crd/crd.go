@@ -24,6 +24,20 @@ func EnsureResource(client apiextensionsclient.Interface) error {
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: "aws.uswitch.com",
 			Scope: v1.NamespaceScoped,
+			Versions: []v1.CustomResourceDefinitionVersion{
+				{
+					Name:       "v1",
+					Served:     true,
+					Storage:    true,
+					Deprecated: false,
+				},
+				{
+					Name:       "v1beta1",
+					Served:     true,
+					Storage:    false,
+					Deprecated: true,
+				},
+			},
 			Names: v1.CustomResourceDefinitionNames{
 				Singular: "sqsautoscaler",
 				Plural:   "sqsautoscalers",
