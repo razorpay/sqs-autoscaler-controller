@@ -1,5 +1,4 @@
-FROM golang:1.20.2-alpine3.17
-
+FROM golang:1.23.1-alpine3.20
 
 ENV SRC_DIR=/go/src/github.com/razorpay/sqs-autoscaler-controller
 
