@@ -1,4 +1,4 @@
-FROM c.rzp.io/razorpay/rzp-docker-image-inventory-multi-arch:rzp-golden-image-base-golang-1.26-alpine3.23
+FROM golang:1.26-alpine3.23
 
 ENV SRC_DIR=/go/src/github.com/razorpay/sqs-autoscaler-controller
 
