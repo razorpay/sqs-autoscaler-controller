@@ -1,6 +1,6 @@
 module github.com/razorpay/sqs-autoscaler-controller
 
-go 1.23
+go 1.26
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.3.2
