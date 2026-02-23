@@ -3,7 +3,7 @@ name: PR Workflow
 on: [push]
 jobs:
   build:
-    runs-on: [k8s-runner, linux-amd64]
+    runs-on: ubuntu-latest
     name: build
     steps:
       - name: checkout
