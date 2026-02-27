@@ -68,7 +68,7 @@ func main() {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 
-	stopChan := make(chan os.Signal)
+	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, os.Interrupt)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
