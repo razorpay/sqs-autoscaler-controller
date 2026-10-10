@@ -14,6 +14,7 @@ func (in *AutoScalerSpec) DeepCopyInto(out *AutoScalerSpec) {
 	out.Deployment = in.Deployment
 	out.MinPods = in.MinPods
 	out.MaxPods = in.MaxPods
+	out.IncludeInFlightInScaleDown = in.IncludeInFlightInScaleDown
 	in.ScaleUp.DeepCopyInto(&out.ScaleUp)
 	in.ScaleDown.DeepCopyInto(&out.ScaleDown)
 }

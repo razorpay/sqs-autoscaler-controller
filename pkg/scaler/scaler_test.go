@@ -140,7 +140,7 @@ func TestTargetReplicas(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := makeDeployment(tt.replicas)
-			got, err := s.targetReplicas(tt.queueLen, scale, d)
+			got, err := s.targetReplicas(QueueStats{Visible: tt.queueLen}, scale, d)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -158,7 +158,7 @@ func TestTargetReplicas_ZeroReplicas(t *testing.T) {
 	d := makeDeployment(0)
 
 	// queue in steady state — should stay at 0
-	got, err := s.targetReplicas(50, scale, d)
+	got, err := s.targetReplicas(QueueStats{Visible: 50}, scale, d)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestTargetReplicas_LargeScaleUp(t *testing.T) {
 	scale := makeScaler(1, 5, 50, 5, 100, 1)
 	d := makeDeployment(3)
 
-	got, err := s.targetReplicas(1000, scale, d)
+	got, err := s.targetReplicas(QueueStats{Visible: 1000}, scale, d)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,11 +188,91 @@ func TestTargetReplicas_LargeScaleDown(t *testing.T) {
 	scale := makeScaler(2, 20, 100, 50, 1, 100)
 	d := makeDeployment(10)
 
-	got, err := s.targetReplicas(0, scale, d)
+	got, err := s.targetReplicas(QueueStats{Visible: 0}, scale, d)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != 2 {
 		t.Errorf("expected floored at minPods=2, got %d", got)
+	}
+}
+
+// in-flight aware scale-down (includeInFlightInScaleDown)
+
+func TestTargetReplicas_InFlightAwareScaleDown(t *testing.T) {
+	s := Scaler{}
+
+	// scaler: minPods=1, maxPods=20, upThreshold=100, downThreshold=10, upAmount=5, downAmount=2
+	newScaler := func(includeInFlight bool) *crd.SqsAutoScaler {
+		scale := makeScaler(1, 20, 100, 10, 5, 2)
+		scale.Spec.IncludeInFlightInScaleDown = includeInFlight
+		return scale
+	}
+
+	tests := []struct {
+		name            string
+		includeInFlight bool
+		visible         int64
+		inFlight        int64
+		replicas        int32
+		want            int32
+	}{
+		{
+			name:            "disabled - in-flight ignored, scales down",
+			includeInFlight: false,
+			visible:         0, inFlight: 30, replicas: 10, want: 8,
+		},
+		{
+			name:            "enabled - in-flight holds replicas (visible drained, workers busy)",
+			includeInFlight: true,
+			visible:         0, inFlight: 30, replicas: 10, want: 10,
+		},
+		{
+			name:            "enabled - scales down when visible+inFlight within threshold",
+			includeInFlight: true,
+			visible:         4, inFlight: 6, replicas: 10, want: 8,
+		},
+		{
+			name:            "enabled - visible+inFlight exactly at threshold scales down",
+			includeInFlight: true,
+			visible:         5, inFlight: 5, replicas: 10, want: 8,
+		},
+		{
+			name:            "enabled - visible+inFlight just above threshold holds",
+			includeInFlight: true,
+			visible:         5, inFlight: 6, replicas: 10, want: 10,
+		},
+		{
+			name:            "enabled - floored at minPods when queue fully idle",
+			includeInFlight: true,
+			visible:         0, inFlight: 0, replicas: 2, want: 1,
+		},
+		// scale-up must stay visible-only even when the flag is on:
+		// in-flight messages already have a worker and must not add pods.
+		{
+			name:            "enabled - scale up ignores in-flight",
+			includeInFlight: true,
+			visible:         50, inFlight: 500, replicas: 7, want: 7,
+		},
+		{
+			name:            "enabled - scale up on visible alone",
+			includeInFlight: true,
+			visible:         100, inFlight: 0, replicas: 5, want: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scale := newScaler(tt.includeInFlight)
+			d := makeDeployment(tt.replicas)
+			got, err := s.targetReplicas(QueueStats{Visible: tt.visible, InFlight: tt.inFlight}, scale, d)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("targetReplicas(visible=%d, inFlight=%d, includeInFlight=%v, replicas=%d) = %d, want %d",
+					tt.visible, tt.inFlight, tt.includeInFlight, tt.replicas, got, tt.want)
+			}
+		})
 	}
 }

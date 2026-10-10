@@ -78,13 +78,24 @@ func scaleFields(scaler *crd.SqsAutoScaler) log.Fields {
 	return log.Fields{"name": scaler.ObjectMeta.Name, "namespace": scaler.ObjectMeta.Namespace, "queue": scaler.Spec.Queue, "deploy": scaler.Spec.Deployment}
 }
 
-func (s Scaler) targetReplicas(size int64, scale *crd.SqsAutoScaler, d *appsv1.Deployment) (int32, error) {
+func (s Scaler) targetReplicas(stats QueueStats, scale *crd.SqsAutoScaler, d *appsv1.Deployment) (int32, error) {
 	replicas := d.Status.Replicas
 
-	if size >= scale.Spec.ScaleUp.Threshold {
+	// Scale-up considers visible messages only: in-flight messages already
+	// have a worker processing them, so they don't need new pods.
+	if stats.Visible >= scale.Spec.ScaleUp.Threshold {
 		desired := replicas + scale.Spec.ScaleUp.Amount
 		return min(desired, scale.Spec.MaxPods), nil
-	} else if size <= scale.Spec.ScaleDown.Threshold {
+	}
+
+	// Scale-down optionally also counts in-flight messages, so workers busy
+	// with long-running tasks aren't scaled away while the visible queue
+	// looks drained.
+	downSize := stats.Visible
+	if scale.Spec.IncludeInFlightInScaleDown {
+		downSize += stats.InFlight
+	}
+	if downSize <= scale.Spec.ScaleDown.Threshold {
 		desired := replicas - scale.Spec.ScaleDown.Amount
 		return max(desired, scale.Spec.MinPods), nil
 	}
@@ -92,7 +103,7 @@ func (s Scaler) targetReplicas(size int64, scale *crd.SqsAutoScaler, d *appsv1.D
 }
 
 func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *crd.SqsAutoScaler) (*appsv1.Deployment, int32, error) {
-	size, err := CurrentQueueSize(sess, scale.Spec.Queue)
+	stats, err := CurrentQueueStats(sess, scale.Spec.Queue)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -107,7 +118,7 @@ func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *
 		return nil, 0, fmt.Errorf("deployment available replicas not at target. won't adjust")
 	}
 
-	replicas, err := s.targetReplicas(size, scale, deployment)
+	replicas, err := s.targetReplicas(stats, scale, deployment)
 	if err != nil {
 		return nil, 0, err
 	}
