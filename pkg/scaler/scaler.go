@@ -3,6 +3,7 @@ package scaler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/razorpay/sqs-autoscaler-controller/pkg/crd"
@@ -14,22 +15,36 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 type Scaler struct {
-	client   *kubernetes.Clientset
-	store    cache.Store
-	interval time.Duration
+	client      *kubernetes.Clientset
+	store       cache.Store
+	interval    time.Duration
+	sqsEndpoint string
 }
 
-func New(client *kubernetes.Clientset, store cache.Store, interval time.Duration) *Scaler {
-	return &Scaler{client, store, interval}
+func New(client *kubernetes.Clientset, store cache.Store, interval time.Duration, sqsEndpoint string) *Scaler {
+	return &Scaler{client, store, interval, sqsEndpoint}
 }
 
 func (s Scaler) Run(ctx context.Context) error {
 	ticker := time.NewTicker(s.interval)
-	sess, err := session.NewSession()
+	var sess *session.Session
+	var err error
+	if s.sqsEndpoint != "" {
+		// Custom endpoint (e.g. ElasticMQ/LocalStack for e2e tests). Plain-HTTP
+		// endpoints need SSL disabled explicitly.
+		cfg := aws.NewConfig().WithEndpoint(s.sqsEndpoint)
+		if strings.HasPrefix(s.sqsEndpoint, "http://") {
+			cfg = cfg.WithDisableSSL(true)
+		}
+		sess, err = session.NewSession(cfg)
+	} else {
+		sess, err = session.NewSession()
+	}
 	if err != nil {
 		return fmt.Errorf("Creating AWS Session: %s", err)
 	}
