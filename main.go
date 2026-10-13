@@ -27,6 +27,7 @@ type options struct {
 	scaleInterval  time.Duration
 	statsD         string
 	statsDInterval time.Duration
+	sqsEndpoint    string
 }
 
 func createClientConfig(opts *options) (*rest.Config, error) {
@@ -61,6 +62,7 @@ func main() {
 
 	kingpin.Flag("statsd", "UDP address to publish StatsD metrics. e.g. 127.0.0.1:8125").Default("").StringVar(&opts.statsD)
 	kingpin.Flag("statsd-interval", "Interval to publish to StatsD").Default("10s").DurationVar(&opts.statsDInterval)
+	kingpin.Flag("sqs-endpoint", "Custom SQS endpoint URL. Empty = real AWS.").Default("").StringVar(&opts.sqsEndpoint)
 
 	kingpin.Parse()
 
@@ -109,7 +111,7 @@ func main() {
 	cache := crd.NewCache(sc, opts.syncInterval)
 	go cache.Run(ctx)
 
-	s := scaler.New(cs, cache.Store, opts.scaleInterval)
+	s := scaler.New(cs, cache.Store, opts.scaleInterval, opts.sqsEndpoint)
 	go s.Run(ctx)
 
 	<-stopChan
