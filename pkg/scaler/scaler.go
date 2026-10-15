@@ -3,6 +3,7 @@ package scaler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/razorpay/sqs-autoscaler-controller/pkg/crd"
@@ -14,22 +15,36 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 type Scaler struct {
-	client   *kubernetes.Clientset
-	store    cache.Store
-	interval time.Duration
+	client      *kubernetes.Clientset
+	store       cache.Store
+	interval    time.Duration
+	sqsEndpoint string
 }
 
-func New(client *kubernetes.Clientset, store cache.Store, interval time.Duration) *Scaler {
-	return &Scaler{client, store, interval}
+func New(client *kubernetes.Clientset, store cache.Store, interval time.Duration, sqsEndpoint string) *Scaler {
+	return &Scaler{client, store, interval, sqsEndpoint}
 }
 
 func (s Scaler) Run(ctx context.Context) error {
 	ticker := time.NewTicker(s.interval)
-	sess, err := session.NewSession()
+	var sess *session.Session
+	var err error
+	if s.sqsEndpoint != "" {
+		// Custom endpoint (e.g. ElasticMQ/LocalStack for e2e tests). Plain-HTTP
+		// endpoints need SSL disabled explicitly.
+		cfg := aws.NewConfig().WithEndpoint(s.sqsEndpoint)
+		if strings.HasPrefix(s.sqsEndpoint, "http://") {
+			cfg = cfg.WithDisableSSL(true)
+		}
+		sess, err = session.NewSession(cfg)
+	} else {
+		sess, err = session.NewSession()
+	}
 	if err != nil {
 		return fmt.Errorf("Creating AWS Session: %s", err)
 	}
@@ -63,13 +78,24 @@ func scaleFields(scaler *crd.SqsAutoScaler) log.Fields {
 	return log.Fields{"name": scaler.ObjectMeta.Name, "namespace": scaler.ObjectMeta.Namespace, "queue": scaler.Spec.Queue, "deploy": scaler.Spec.Deployment}
 }
 
-func (s Scaler) targetReplicas(size int64, scale *crd.SqsAutoScaler, d *appsv1.Deployment) (int32, error) {
+func (s Scaler) targetReplicas(stats QueueStats, scale *crd.SqsAutoScaler, d *appsv1.Deployment) (int32, error) {
 	replicas := d.Status.Replicas
 
-	if size >= scale.Spec.ScaleUp.Threshold {
+	// Scale-up considers visible messages only: in-flight messages already
+	// have a worker processing them, so they don't need new pods.
+	if stats.Visible >= scale.Spec.ScaleUp.Threshold {
 		desired := replicas + scale.Spec.ScaleUp.Amount
 		return min(desired, scale.Spec.MaxPods), nil
-	} else if size <= scale.Spec.ScaleDown.Threshold {
+	}
+
+	// Scale-down optionally also counts in-flight messages, so workers busy
+	// with long-running tasks aren't scaled away while the visible queue
+	// looks drained.
+	downSize := stats.Visible
+	if scale.Spec.IncludeInFlightInScaleDown {
+		downSize += stats.InFlight
+	}
+	if downSize <= scale.Spec.ScaleDown.Threshold {
 		desired := replicas - scale.Spec.ScaleDown.Amount
 		return max(desired, scale.Spec.MinPods), nil
 	}
@@ -77,7 +103,7 @@ func (s Scaler) targetReplicas(size int64, scale *crd.SqsAutoScaler, d *appsv1.D
 }
 
 func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *crd.SqsAutoScaler) (*appsv1.Deployment, int32, error) {
-	size, err := CurrentQueueSize(sess, scale.Spec.Queue)
+	stats, err := CurrentQueueStats(sess, scale.Spec.Queue)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -92,7 +118,7 @@ func (s Scaler) executeScale(ctx context.Context, sess *session.Session, scale *
 		return nil, 0, fmt.Errorf("deployment available replicas not at target. won't adjust")
 	}
 
-	replicas, err := s.targetReplicas(size, scale, deployment)
+	replicas, err := s.targetReplicas(stats, scale, deployment)
 	if err != nil {
 		return nil, 0, err
 	}

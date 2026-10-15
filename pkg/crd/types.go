@@ -23,6 +23,13 @@ type AutoScalerSpec struct {
 	MaxPods    int32     `json:"maxPods"`
 	ScaleUp    ScaleSpec `json:"scaleUp"`
 	ScaleDown  ScaleSpec `json:"scaleDown"`
+	// IncludeInFlightInScaleDown makes the scale-down decision consider
+	// in-flight messages (ApproximateNumberOfMessagesNotVisible) in addition
+	// to visible ones. This prevents premature scale-down of workers that are
+	// still processing long-running tasks. Scale-up always uses visible
+	// messages only: in-flight messages already have a worker.
+	// Optional, defaults to false (legacy behaviour).
+	IncludeInFlightInScaleDown bool `json:"includeInFlightInScaleDown,omitempty"`
 }
 
 type ScaleSpec struct {

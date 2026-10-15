@@ -21,6 +21,11 @@ spec:
   scaleUp:
     amount: 5
     threshold: 100
+  # Optional (default false): also count in-flight messages
+  # (ApproximateNumberOfMessagesNotVisible) for the scale-down decision, so
+  # workers busy with long-running tasks aren't scaled away while the visible
+  # queue looks drained. Scale-up always uses visible messages only.
+  includeInFlightInScaleDown: true
 ```
 
 ```
